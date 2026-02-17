@@ -67,6 +67,22 @@ let personMask = null; // current smoothed mask
 let prevMask = null; // previous frame's mask for temporal smoothing
 let maskW = 0;
 let maskH = 0;
+// Layout metrics for centering/scaling video to cover screen
+let renderScale = 1;
+let renderDx = 0;
+let renderDy = 0;
+
+function updateLayout() {
+    const W = canvas.width;
+    const H = canvas.height;
+    if (maskW > 0 && maskH > 0) {
+        renderScale = Math.max(W / maskW, H / maskH);
+        const dw = maskW * renderScale;
+        const dh = maskH * renderScale;
+        renderDx = (W - dw) / 2;
+        renderDy = (H - dh) / 2;
+    }
+}
 const PERSON_THRESHOLD = 0.40;
 const MASK_SMOOTHING = 0.35; // blend factor: 0 = all old, 1 = all new
 
@@ -395,10 +411,12 @@ async function enableCam() {
 // ---- Countdown ----
 let previewRunning = false;
 
-// Preview loop: draws bg + silhouette during countdown (no bubbles)
+// Preview loop: draws bg + silhouette during countdown
 function previewLoop() {
     if (!previewRunning) return;
     runSegmentation();
+    // Use the main draw function logic simplified, or just call drawGame(0) but without bubbles
+    // Easier to duplicate simple logic for preview to avoid update recursion
     drawPreview();
     requestAnimationFrame(previewLoop);
 }
@@ -407,28 +425,31 @@ function drawPreview() {
     const W = canvas.width;
     const H = canvas.height;
 
-    // Background image
+    // Background (Tiled)
     const bgImg = bgImages[selectedTheme];
     if (bgImg && bgImg.complete && bgImg.naturalWidth > 0) {
-        ctx.drawImage(bgImg, 0, 0, W, H);
+        const pat = ctx.createPattern(bgImg, 'repeat');
+        ctx.fillStyle = pat;
+        ctx.fillRect(0, 0, W, H);
     } else {
         const theme = THEME_COLORS[selectedTheme] || THEME_COLORS.unicorn;
         ctx.fillStyle = theme.bg;
         ctx.fillRect(0, 0, W, H);
     }
 
-    // Silhouette
+    // Silhouette (Center Crop/Cover)
     if (personMask && maskW > 0 && maskH > 0) {
-        if (!offCanvas || offCanvas.width !== W || offCanvas.height !== H) {
-            offCanvas = document.createElement('canvas');
-            offCanvas.width = W;
-            offCanvas.height = H;
-            offCtx = offCanvas.getContext('2d');
-            maskCanvas = document.createElement('canvas');
-            maskCanvas.width = W;
-            maskCanvas.height = H;
+        // Use shared layout metrics
+        const dw = maskW * renderScale;
+        const dh = maskH * renderScale;
+
+        if (!maskCanvas || maskCanvas.width !== maskW || maskCanvas.height !== maskH) {
+            maskCanvas = document.createElement('canvas'); maskCanvas.width = maskW; maskCanvas.height = maskH;
             maskCtx = maskCanvas.getContext('2d');
+            offCanvas = document.createElement('canvas'); offCanvas.width = maskW; offCanvas.height = maskH;
+            offCtx = offCanvas.getContext('2d');
         }
+
         const maskImgData = maskCtx.createImageData(maskW, maskH);
         const md = maskImgData.data;
         for (let i = 0; i < personMask.length; i++) {
@@ -440,15 +461,17 @@ function drawPreview() {
             }
         }
         maskCtx.putImageData(maskImgData, 0, 0);
+
         const rgb = SILHOUETTE_RGB[selectedColor] || SILHOUETTE_RGB.hotpink;
-        offCtx.clearRect(0, 0, W, H);
+        offCtx.clearRect(0, 0, maskW, maskH);
         offCtx.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
-        offCtx.fillRect(0, 0, W, H);
+        offCtx.fillRect(0, 0, maskW, maskH);
         offCtx.globalCompositeOperation = 'destination-in';
-        offCtx.drawImage(maskCanvas, 0, 0, W, H);
+        offCtx.drawImage(maskCanvas, 0, 0);
         offCtx.globalCompositeOperation = 'source-over';
+
         ctx.globalAlpha = 0.5;
-        ctx.drawImage(offCanvas, 0, 0);
+        ctx.drawImage(offCanvas, 0, 0, maskW, maskH, renderDx, renderDy, dw, dh);
         ctx.globalAlpha = 1;
     }
 }
@@ -488,13 +511,11 @@ function runCountdown() {
 async function handleStart() {
     startBtn.disabled = true;
     const camOk = await enableCam();
-    if (camOk && video.videoWidth > 0) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-    } else {
-        canvas.width = 1280;
-        canvas.height = 720;
-    }
+
+    // Set canvas to full window size
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
     await runCountdown();
     score = 0;
     solarSpawned = false;
@@ -564,6 +585,13 @@ function gameLoop(now) {
     requestAnimationFrame(gameLoop);
 }
 
+// ---- Resize Handling ----
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    updateLayout();
+}
+
 // ---- Segmentation with Temporal Smoothing ----
 function runSegmentation() {
     if (!imageSegmenter || !webcamRunning) return;
@@ -581,12 +609,15 @@ function runSegmentation() {
             const rawData = result.confidenceMasks[0].getAsFloat32Array();
             const pixelCount = vw * vh;
 
+            // We store the mask in its NATIVE video resolution (e.g. 640x480)
+            // We will scale/crop it when drawing to the full-screen canvas.
             if (!personMask || personMask.length !== pixelCount) {
                 personMask = new Float32Array(pixelCount);
                 prevMask = new Float32Array(pixelCount);
+                maskW = vw;
+                maskH = vh;
+                updateLayout();
             }
-            maskW = vw;
-            maskH = vh;
 
             // Store old mask
             prevMask.set(personMask);
@@ -654,10 +685,14 @@ function updateGame(now) {
 // ---- Person Collision Detection ----
 function isPersonAt(cx, cy) {
     if (!personMask) return false;
-    const ix = Math.floor(cx);
-    const iy = Math.floor(cy);
-    if (ix < 0 || ix >= maskW || iy < 0 || iy >= maskH) return false;
-    return personMask[iy * maskW + ix] > PERSON_THRESHOLD;
+    // Transform screen coord (cx, cy) -> mask coord (mx, my)
+    // screen = mask * scale + offset
+    // mask = (screen - offset) / scale
+    const mx = Math.floor((cx - renderDx) / renderScale);
+    const my = Math.floor((cy - renderDy) / renderScale);
+
+    if (mx < 0 || mx >= maskW || my < 0 || my >= maskH) return false;
+    return personMask[my * maskW + mx] > PERSON_THRESHOLD;
 }
 
 function checkPersonCollisions() {
@@ -690,31 +725,48 @@ function drawGame(now) {
     const W = canvas.width;
     const H = canvas.height;
 
-    // 1. Background image (fall back to solid color)
+    // 1. Background image (cover style)
     const theme = THEME_COLORS[selectedTheme] || THEME_COLORS.unicorn;
     const bgImg = bgImages[selectedTheme];
+
+    // Draw background filling the screen (preserving aspect ratio/seamless logic)
+    // Since we regenerated them as seamless, we can just draw them covering the screen.
+    // Or simpler: just stretched? User asked for "periodic". 
+    // Let's use simple cover logic for now or pattern if they were patterns.
+    // User asked "regenerate... so they are periodic".
+    // I will use createPattern for tiling!
     if (bgImg && bgImg.complete && bgImg.naturalWidth > 0) {
-        ctx.drawImage(bgImg, 0, 0, W, H);
+        const pat = ctx.createPattern(bgImg, 'repeat');
+        ctx.fillStyle = pat;
+        ctx.fillRect(0, 0, W, H);
     } else {
         ctx.fillStyle = theme.bg;
         ctx.fillRect(0, 0, W, H);
     }
 
-    // 2. Player silhouette using offscreen canvas compositing (fast, no getImageData)
+    // 2. Player silhouette (CENTER CROP / COVER)
     if (personMask && maskW > 0 && maskH > 0) {
-        // Ensure offscreen canvases match size
-        if (!offCanvas || offCanvas.width !== W || offCanvas.height !== H) {
-            offCanvas = document.createElement('canvas');
-            offCanvas.width = W;
-            offCanvas.height = H;
-            offCtx = offCanvas.getContext('2d');
+        // Use shared layout metrics
+        const dw = maskW * renderScale;
+        const dh = maskH * renderScale;
+
+        // Prepare mask canvas (at native video resolution)
+        if (!maskCanvas || maskCanvas.width !== maskW || maskCanvas.height !== maskH) {
             maskCanvas = document.createElement('canvas');
-            maskCanvas.width = W;
-            maskCanvas.height = H;
+            maskCanvas.width = maskW;
+            maskCanvas.height = maskH;
             maskCtx = maskCanvas.getContext('2d');
         }
 
-        // Build mask image from personMask Float32Array
+        // Prepare offscreen canvas (at native video resolution) for color fill
+        if (!offCanvas || offCanvas.width !== maskW || offCanvas.height !== maskH) {
+            offCanvas = document.createElement('canvas');
+            offCanvas.width = maskW;
+            offCanvas.height = maskH;
+            offCtx = offCanvas.getContext('2d');
+        }
+
+        // Put mask data
         const maskImgData = maskCtx.createImageData(maskW, maskH);
         const md = maskImgData.data;
         for (let i = 0; i < personMask.length; i++) {
@@ -727,22 +779,21 @@ function drawGame(now) {
                 md[idx + 2] = 255;
                 md[idx + 3] = a;
             }
-            // else stays 0,0,0,0 (transparent)
         }
         maskCtx.putImageData(maskImgData, 0, 0);
 
-        // Draw silhouette color, then cut with mask
+        // Composite silhouette color + mask (at native res)
         const rgb = SILHOUETTE_RGB[selectedColor] || SILHOUETTE_RGB.hotpink;
-        offCtx.clearRect(0, 0, W, H);
+        offCtx.clearRect(0, 0, maskW, maskH);
         offCtx.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
-        offCtx.fillRect(0, 0, W, H);
+        offCtx.fillRect(0, 0, maskW, maskH);
         offCtx.globalCompositeOperation = 'destination-in';
-        offCtx.drawImage(maskCanvas, 0, 0, W, H);
+        offCtx.drawImage(maskCanvas, 0, 0);
         offCtx.globalCompositeOperation = 'source-over';
 
-        // Composite onto main canvas as semi-transparent overlay
+        // Draw scale/cropped onto main canvas
         ctx.globalAlpha = 0.5;
-        ctx.drawImage(offCanvas, 0, 0);
+        ctx.drawImage(offCanvas, 0, 0, maskW, maskH, renderDx, renderDy, dw, dh);
         ctx.globalAlpha = 1;
     }
 
