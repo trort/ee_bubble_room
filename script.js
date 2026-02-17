@@ -395,7 +395,7 @@ async function enableCam() {
     if (webcamRunning) return true;
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
-            video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }
+            video: { width: { ideal: 640, max: 640 }, height: { ideal: 480, max: 480 }, facingMode: 'user' }
         });
         video.srcObject = stream;
         await video.play();
