@@ -83,6 +83,7 @@ html {
     background: linear-gradient(90deg, #ff69b4, #00bfff, #ff69b4);
     background-size: 200%;
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
     animation: shimmer 3s ease-in-out infinite;
 }
@@ -232,13 +233,44 @@ html {
     color: var(--secondary);
 }
 
-#high-scores-list {
-    font-size: 1rem;
-    margin-bottom: 8px;
-    opacity: 0.8;
+#game-border {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 5;
+    background-size: 100% 100%;
+    /* Default mix-blend-mode and background handled by classes */
 }
 
-/* ===== Responsive ===== */
+/* Light themes -> Multiply (white becomes transparent) */
+#game-border.unicorn {
+    background-image: url('assets/unicorn_border.png');
+    mix-blend-mode: multiply;
+}
+
+#game-border.rainbow {
+    background-image: url('assets/rainbow_border.png');
+    mix-blend-mode: multiply;
+}
+
+/* Dark themes -> Screen (black becomes transparent) */
+#game-border.forest {
+    background-image: url('assets/forest_border.png');
+    mix-blend-mode: screen;
+}
+
+#game-border.undersea {
+    /* TODO: Undersea border image generation failed, retrying... */
+    background-image: url('assets/undersea_border.png');
+    /* Anticipating success */
+    mix-blend-mode: screen;
+}
+
+/* ------------------------------------------------------------------ */
+/* Responsive Layout */
 @media (max-width: 600px) {
     #start-screen h1 {
         font-size: 2.2rem;

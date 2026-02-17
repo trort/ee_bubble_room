@@ -690,10 +690,15 @@ function popBubble(b) {
 }
 
 // ---- UI Wiring ----
+const gameBorder = document.getElementById('game-border');
+// Set initial border
+gameBorder.className = selectedTheme;
+
 themeBtns.forEach(btn => btn.addEventListener('click', () => {
     themeBtns.forEach(b => b.classList.remove('selected'));
     btn.classList.add('selected');
     selectedTheme = btn.dataset.theme;
+    gameBorder.className = selectedTheme;
 }));
 
 colorBtns.forEach(btn => btn.addEventListener('click', () => {
