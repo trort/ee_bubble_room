@@ -10,7 +10,9 @@ An **AR web game** designed for children aged 4–6. Players become a vibrant ne
 ## ✨ Features
 
 - **Real-time AR** — MediaPipe Selfie Segmentation transforms the player into a glowing silhouette
-- **Bubble Physics** — 120+ bubbles with elastic collisions, edge bouncing, and organic drift
+- **Themed Backgrounds** — Each theme has a unique generated background image
+- **Countdown Preview** — See your silhouette during the 3-2-1 countdown so kids can find themselves
+- **Bubble Physics** — 60 bubbles with elastic collisions, edge bouncing, and organic drift
 - **Solar Flare** — A special rainbow-pulsing orb that chain-pops every bubble on screen
 - **4 Themes** — Unicorn 🦄, Rainbow 🌈, Forest 🌲, and Undersea 🐠
 - **4 Silhouette Colors** — Hot Pink, Cyan, Lime, and Gold
@@ -28,8 +30,8 @@ An **AR web game** designed for children aged 4–6. Players become a vibrant ne
 
 ```bash
 # Clone the repo
-git clone https://github.com/trort/bubble_room.git
-cd bubble_room
+git clone https://github.com/trort/ee_bubble_room.git
+cd ee_bubble_room
 
 # Serve locally (HTTPS required for camera access)
 python3 -m http.server 8080
@@ -57,6 +59,7 @@ bubble_room/
 ├── index.html          # Main HTML with game canvas and UI overlays
 ├── style.css           # Styling for start/end screens, HUD, animations
 ├── script.js           # Core game logic, physics, segmentation
+├── assets/             # Generated theme background images
 ├── DESIGN_DOC.md       # Full game design document
 └── README.md
 ```

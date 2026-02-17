@@ -393,18 +393,84 @@ async function enableCam() {
 }
 
 // ---- Countdown ----
+let previewRunning = false;
+
+// Preview loop: draws bg + silhouette during countdown (no bubbles)
+function previewLoop() {
+    if (!previewRunning) return;
+    runSegmentation();
+    drawPreview();
+    requestAnimationFrame(previewLoop);
+}
+
+function drawPreview() {
+    const W = canvas.width;
+    const H = canvas.height;
+
+    // Background image
+    const bgImg = bgImages[selectedTheme];
+    if (bgImg && bgImg.complete && bgImg.naturalWidth > 0) {
+        ctx.drawImage(bgImg, 0, 0, W, H);
+    } else {
+        const theme = THEME_COLORS[selectedTheme] || THEME_COLORS.unicorn;
+        ctx.fillStyle = theme.bg;
+        ctx.fillRect(0, 0, W, H);
+    }
+
+    // Silhouette
+    if (personMask && maskW > 0 && maskH > 0) {
+        if (!offCanvas || offCanvas.width !== W || offCanvas.height !== H) {
+            offCanvas = document.createElement('canvas');
+            offCanvas.width = W;
+            offCanvas.height = H;
+            offCtx = offCanvas.getContext('2d');
+            maskCanvas = document.createElement('canvas');
+            maskCanvas.width = W;
+            maskCanvas.height = H;
+            maskCtx = maskCanvas.getContext('2d');
+        }
+        const maskImgData = maskCtx.createImageData(maskW, maskH);
+        const md = maskImgData.data;
+        for (let i = 0; i < personMask.length; i++) {
+            const v = personMask[i];
+            if (v > PERSON_THRESHOLD) {
+                const a = Math.floor(Math.min(1.0, v * 1.3) * 220);
+                const idx = i * 4;
+                md[idx] = 255; md[idx + 1] = 255; md[idx + 2] = 255; md[idx + 3] = a;
+            }
+        }
+        maskCtx.putImageData(maskImgData, 0, 0);
+        const rgb = SILHOUETTE_RGB[selectedColor] || SILHOUETTE_RGB.hotpink;
+        offCtx.clearRect(0, 0, W, H);
+        offCtx.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+        offCtx.fillRect(0, 0, W, H);
+        offCtx.globalCompositeOperation = 'destination-in';
+        offCtx.drawImage(maskCanvas, 0, 0, W, H);
+        offCtx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 0.5;
+        ctx.drawImage(offCanvas, 0, 0);
+        ctx.globalAlpha = 1;
+    }
+}
+
 function runCountdown() {
     return new Promise(resolve => {
         startScreen.classList.add('hidden');
         startScreen.classList.remove('active');
         countdownOv.classList.remove('hidden');
         countdownOv.classList.add('active');
+
+        // Start preview so bg + silhouette are visible under the countdown
+        previewRunning = true;
+        requestAnimationFrame(previewLoop);
+
         let count = 3;
         countdownNum.textContent = count;
         const iv = setInterval(() => {
             count--;
             if (count <= 0) {
                 clearInterval(iv);
+                previewRunning = false; // stop preview
                 countdownOv.classList.add('hidden');
                 countdownOv.classList.remove('active');
                 resolve();
