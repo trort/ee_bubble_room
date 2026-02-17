@@ -95,6 +95,8 @@ let score = 0;
 let gameStartMs = 0;
 let lastSpawnMs = 0;
 let solarSpawned = false;
+let solarSpawnMs = 0;    // timestamp when solar flare was spawned
+let cameraActive = false; // whether webcam is running
 
 // ---- Bubble Physics Constants ----
 const EDGE_MARGIN = 10;   // px from canvas edge where bubbles bounce
@@ -400,10 +402,12 @@ async function enableCam() {
         video.srcObject = stream;
         await video.play();
         webcamRunning = true;
+        cameraActive = true;
         console.log('[Bubble Room] Camera active', video.videoWidth, 'x', video.videoHeight);
         return true;
     } catch (e) {
         console.warn('[Bubble Room] Camera error:', e);
+        cameraActive = false;
         return false;
     }
 }
@@ -530,6 +534,7 @@ async function handleStart() {
     await runCountdown();
     score = 0;
     solarSpawned = false;
+    solarSpawnMs = 0;
     bubbles.forEach(b => b.reset());
     particles.length = 0;
     personMask = null;
@@ -544,6 +549,13 @@ async function handleStart() {
     hud.classList.add('active');
     endScreen.classList.add('hidden');
     gameActive = true;
+
+    // Enable click/touch popping when camera is not available
+    if (!cameraActive) {
+        canvas.addEventListener('click', handleCanvasClick);
+        canvas.addEventListener('touchstart', handleCanvasTouch, { passive: false });
+    }
+
     requestAnimationFrame(gameLoop);
 }
 
@@ -556,6 +568,10 @@ function endGame() {
     finalScoreEl.textContent = `Final Score: ${score}`;
     saveHighScore(score);
     renderHighScores();
+
+    // Remove click/touch handlers
+    canvas.removeEventListener('click', handleCanvasClick);
+    canvas.removeEventListener('touchstart', handleCanvasTouch);
 }
 
 // ---- High Scores ----
@@ -664,12 +680,26 @@ function updateGame(now) {
         lastSpawnMs = now;
     }
 
-    // Solar flare: one special bubble between 45s and 53s (per design doc)
+    // Solar flare: one special bubble between 25s and 35s
     const elapsedSec = elapsed / 1000;
-    if (!solarSpawned && elapsedSec >= 45 && elapsedSec <= 53) {
+    if (!solarSpawned && elapsedSec >= 25 && elapsedSec <= 35) {
         if (Math.random() < 0.02) { // ~2% per frame for reliable spawn
             spawnBubble(true);
             solarSpawned = true;
+            solarSpawnMs = now;
+        }
+    }
+
+    // After 5 seconds, solar flare becomes a normal bubble
+    if (solarSpawned && solarSpawnMs > 0) {
+        const solarAge = (now - solarSpawnMs) / 1000;
+        if (solarAge >= 5) {
+            for (const b of bubbles) {
+                if (b.active && b.isSolar) {
+                    b.isSolar = false;
+                }
+            }
+            solarSpawnMs = 0; // stop checking
         }
     }
 
@@ -889,5 +919,55 @@ startBtn.addEventListener('click', handleStart);
 restartBtn.addEventListener('click', () => {
     endScreen.classList.add('hidden');
     endScreen.classList.remove('active');
-    handleStart();
+
+    // Reset selections back to random
+    selectedTheme = 'random';
+    selectedColor = 'random';
+
+    // Reset button selected states
+    themeBtns.forEach(b => {
+        b.classList.toggle('selected', b.dataset.theme === 'random');
+    });
+    colorBtns.forEach(b => {
+        b.classList.toggle('selected', b.dataset.color === 'random');
+    });
+
+    // Show start screen for theme/color re-selection
+    startScreen.classList.remove('hidden');
+    startScreen.classList.add('active');
+    startBtn.disabled = false;
+    startBtn.textContent = '▶ GO!';
 });
+
+// ---- Click/Touch Fallback (no camera) ----
+function handleCanvasClick(e) {
+    if (!gameActive) return;
+    const rect = canvas.getBoundingClientRect();
+    const sx = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const sy = (e.clientY - rect.top) * (canvas.height / rect.height);
+    popBubbleAt(sx, sy);
+}
+
+function handleCanvasTouch(e) {
+    if (!gameActive) return;
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    for (const touch of e.changedTouches) {
+        const sx = (touch.clientX - rect.left) * (canvas.width / rect.width);
+        const sy = (touch.clientY - rect.top) * (canvas.height / rect.height);
+        popBubbleAt(sx, sy);
+    }
+}
+
+function popBubbleAt(sx, sy) {
+    // Find the closest overlapping bubble and pop it
+    for (const b of bubbles) {
+        if (!b.active) continue;
+        const dx = b.x - sx;
+        const dy = b.y - sy;
+        if (dx * dx + dy * dy < b.radius * b.radius) {
+            popBubble(b);
+            return; // pop only one per click
+        }
+    }
+}
