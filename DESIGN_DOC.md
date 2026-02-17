@@ -1,8 +1,8 @@
-# Game Design Document: Bubble Room (Junior Edition)
+# Game Design Document: EE's Bubble Room!
 
 ## 1. Project Overview
 
-**Bubble Room** is a client-side AR web application hosted on **GitHub Pages**. It transforms the player into a vibrant neon silhouette within a themed world. The game is specifically tuned for the motor skills and attention spans of children aged 4–6.
+**EE's Bubble Room!** is a client-side AR web application hosted on **GitHub Pages**. It transforms the player into a vibrant neon silhouette within a themed world. The game is specifically tuned for the motor skills and attention spans of children aged 4–6.
 
 ## 2. Technical Architecture
 

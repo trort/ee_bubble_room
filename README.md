@@ -1,8 +1,8 @@
-# 🫧 Bubble Room — Junior Edition
+# 🫧 EE's Bubble Room!
 
 An **AR web game** designed for children aged 4–6. Players become a vibrant neon silhouette and pop floating bubbles by moving their body!
 
-### 🕹️ [Play Now →](https://trort.github.io/ee_bubble_room/)
+### 🕹️ [Play Now →](https://trort.github.io/ee-bubble-room/)
 
 ![HTML5](https://img.shields.io/badge/HTML5-Canvas-orange)
 ![JavaScript](https://img.shields.io/badge/JavaScript-ES6+-yellow)
@@ -32,8 +32,8 @@ An **AR web game** designed for children aged 4–6. Players become a vibrant ne
 
 ```bash
 # Clone the repo
-git clone https://github.com/trort/ee_bubble_room.git
-cd ee_bubble_room
+git clone https://github.com/trort/ee-bubble-room.git
+cd ee-bubble-room
 
 # Serve locally (HTTPS required for camera access)
 python3 -m http.server 8080
