@@ -120,28 +120,28 @@ class Bubble {
     spawn(w, h, isSolar = false, spawnX = -1, spawnY = -1) {
         this.active = true;
         this.isSolar = isSolar;
-        this.radius = 3;
-        this.maxRadius = isSolar ? 80 + Math.random() * 25 : 20 + Math.random() * 18;
-        this.growthRate = 0.6 + Math.random() * 0.5;
+        const unit = Math.min(w, h); // base unit for relative sizing
+        this.radius = unit * 0.005; // start tiny
+        this.maxRadius = isSolar
+            ? unit * (0.12 + Math.random() * 0.04)   // solar: 12-16% of screen
+            : unit * (0.03 + Math.random() * 0.03);   // normal: 3-6% of screen
+        this.growthRate = unit * 0.001 + Math.random() * unit * 0.0008;
         this.colorIdx = Math.floor(Math.random() * BUBBLE_FILL.length);
         this.phase = Math.random() * Math.PI * 2;
-        this.mass = this.maxRadius * this.maxRadius; // mass proportional to area
+        this.mass = this.maxRadius * this.maxRadius;
 
         if (spawnX >= 0 && spawnY >= 0) {
-            // Use the provided spawn position
             this.x = spawnX;
             this.y = spawnY;
         } else {
-            // Random edge spawn
             const fromLeft = Math.random() < 0.5;
             this.x = fromLeft ? -5 : w + 5;
             this.y = h * 0.1 + Math.random() * (h * 0.8);
         }
 
-        // Random direction: angle from horizontal ± 60°
-        const baseAngle = this.x < w / 2 ? 0 : Math.PI; // point inward
-        const spread = (Math.random() - 0.5) * (Math.PI * 0.65); // ±58°
-        const speed = 1.5 + Math.random() * 2.5; // faster
+        const baseAngle = this.x < w / 2 ? 0 : Math.PI;
+        const spread = (Math.random() - 0.5) * (Math.PI * 0.65);
+        const speed = unit * (0.003 + Math.random() * 0.004); // relative speed
         this.vx = Math.cos(baseAngle + spread) * speed;
         this.vy = Math.sin(baseAngle + spread) * speed;
     }
