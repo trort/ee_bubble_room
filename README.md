@@ -2,6 +2,8 @@
 
 An **AR web game** designed for children aged 4–6. Players become a vibrant neon silhouette and pop floating bubbles by moving their body!
 
+### 🕹️ [Play Now →](https://trort.github.io/ee_bubble_room/)
+
 ![HTML5](https://img.shields.io/badge/HTML5-Canvas-orange)
 ![JavaScript](https://img.shields.io/badge/JavaScript-ES6+-yellow)
 ![MediaPipe](https://img.shields.io/badge/MediaPipe-Selfie_Segmentation-blue)
