@@ -37,15 +37,11 @@ const THEME_COLORS = {
 
 // ---- Preloaded theme images ----
 const bgImages = {};
-const borderImages = {};
 const THEMES = ['unicorn', 'rainbow', 'forest', 'undersea'];
 THEMES.forEach(t => {
     const bg = new Image();
     bg.src = `assets/${t}_bg.png`;
     bgImages[t] = bg;
-    const br = new Image();
-    br.src = `assets/${t}_border.png`;
-    borderImages[t] = br;
 });
 
 // ---- Offscreen canvas for silhouette (avoids getImageData) ----
@@ -678,8 +674,10 @@ function drawGame(now) {
         offCtx.drawImage(maskCanvas, 0, 0, W, H);
         offCtx.globalCompositeOperation = 'source-over';
 
-        // Composite onto main canvas
+        // Composite onto main canvas as semi-transparent overlay
+        ctx.globalAlpha = 0.5;
         ctx.drawImage(offCanvas, 0, 0);
+        ctx.globalAlpha = 1;
     }
 
     // 3. Bubbles
@@ -704,12 +702,6 @@ function drawGame(now) {
         ctx.fillRect(0, 0, W, H);
         ctx.globalAlpha = 1;
         screenFlashAlpha -= 0.04;
-    }
-
-    // 6. Border overlay (drawn on canvas — scales correctly at any aspect ratio)
-    const borderImg = borderImages[selectedTheme];
-    if (borderImg && borderImg.complete && borderImg.naturalWidth > 0) {
-        ctx.drawImage(borderImg, 0, 0, W, H);
     }
 }
 
